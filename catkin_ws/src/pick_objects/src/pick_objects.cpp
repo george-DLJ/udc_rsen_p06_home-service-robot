@@ -40,19 +40,21 @@ int main(int argc, char** argv){
   else
     ROS_INFO("ERROR: the robot failed to reach Pick Up zone");
 
-  //TODO: add pause 5 seconds
+  //DONE: add pause 5 seconds
+  ros::Duration(5.0).sleep();  // Sleep for 5 seconds
 
-  //TODO: add new goal
+  // 2. Add Drop off goal
+  // 2.1 DONE: add new goal
   goal.target_pose.pose.position.x = 2.0;
   goal.target_pose.pose.orientation.w = 1.0;
-
    // Send the goal position and orientation for the robot to reach
   ROS_INFO("Sending Drop Off goal");
   ac.sendGoal(goal);
-  //TODO: wait for results
+
+  //2.2 wait for results
   ac.waitForResult();
 
-  //TODO: check if robot reached its goal 
+  //2.3 check if robot reached its goal 
   if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
     ROS_INFO("Hooray, robot has reachend Drop Off zone");
   else
