@@ -32,19 +32,31 @@
 
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
+#include <nav_msgs/Odometry.h>
+// Define a tolerance threshold to compare double values
+const double positionTolerance = 0.2;//meters
+const double moveTolerance = 0.0001;//meters
+// Predefined pick up and drop off zones:
+const std::vector<double> robot_pickup_position{ -2.36, 2.17, 0.0 }; //x, y, z
+const std::vector<double> robot_dropoff_position{ -1.36, -1.73, 0.0 }; //x, y, z
 
-int main( int argc, char** argv )
+// Define global vector of last position:
+std::vector<double> robot_last_position{ 0.0, 0.0, 0.0 };
+// state values
+bool markerPickedUp = false;
+bool markerDroppedOff = false;
+bool moving_state = false;
+
+
+//global variable marker
+visualization_msgs::Marker marker;
+ros::Publisher marker_pub;
+
+void initMarker()
 {
-  ros::init(argc, argv, "add_markers");
-  ros::NodeHandle n;
-  ros::Rate r(1);
-  ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-
-  // Set our initial shape type to be a cube
-  uint32_t shape = visualization_msgs::Marker::CUBE; 
-
-
-    visualization_msgs::Marker marker;
+// Set our initial shape type to be a cube
+    uint32_t shape = visualization_msgs::Marker::CUBE; 
+  
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     marker.header.frame_id = "map";
     marker.header.stamp = ros::Time::now();
@@ -84,7 +96,134 @@ int main( int argc, char** argv )
     marker.color.b = 0.0f;
     marker.color.a = 1.0;
 
-    marker.lifetime = ros::Duration(5); //5 seconds
+    marker.lifetime = ros::Duration(); //5 seconds
+}
+
+void setMarkerPositionXY(double posx, double posy)
+{
+	marker.pose.position.x = posx;
+    	marker.pose.position.y = posy;
+	marker.action = visualization_msgs::Marker::ADD;
+}
+
+void hideMarker()
+{	ros::Rate r(1);
+ 	marker.action = visualization_msgs::Marker::DELETE;
+	marker_pub.publish(marker);
+}
+
+void showMarker()
+{
+	ros::Rate r(1);
+	marker_pub.publish(marker);
+    	r.sleep();
+}
+
+void pickUpMarker()
+{
+    // simulate pickup
+    ROS_INFO("Picking Marker (5 seconds)");
+    ros::Duration(5.0).sleep(); 
+    
+    // Hiding marker:
+    ROS_INFO("Hiding Marker");
+    hideMarker();
+    // TODO: moveToDropOffZone();
+}
+
+void dropOffMarker()
+{
+    // simulate drop off
+    ROS_INFO("Droping Off Marker (5 seconds)");
+    ros::Duration(5.0).sleep(); 	
+    // Change marker  location:
+    setMarkerPositionXY(robot_dropoff_position[0], robot_dropoff_position[1]);	
+    // TODO: showMarker(dropOffZone)
+    showMarker();
+}
+
+bool robotOnPickupPosition( std::vector<double> robot_current_position)
+{
+	if (fabs(robot_current_position[0] - robot_pickup_position[0]) < positionTolerance && fabs(robot_current_position[1] - robot_pickup_position[1]) < positionTolerance)
+	{
+        markerPickedUp = true;
+	ROS_INFO("MARKER PICKED UP (Position(x,y,z): [%f], [%f], [%f]", robot_current_position[0],robot_current_position[1], robot_current_position[2]);
+		return true;
+	}
+	return false;
+}
+
+bool robotOnDropOffPosition( std::vector<double> robot_current_position)
+{
+	if (markerPickedUp && fabs(robot_current_position[0] - robot_dropoff_position[0]) < positionTolerance && fabs(robot_current_position[1] - robot_dropoff_position[1]) < positionTolerance)
+	{
+        	markerDroppedOff = true;
+		ROS_INFO("MARKER Dropped Off (Position(x,y,z): [%f], [%f], [%f]", robot_current_position[0],robot_current_position[1], robot_current_position[2]);
+		return true;
+	}
+	return false;
+}
+
+void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg)
+{
+//get current position
+// Get joints current position
+    std::vector<double> robot_current_position = {msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z};
+
+  //double posx = msg->pose.pose.position.x;
+  //double posy = msg->pose.pose.position.y;
+  //double posz = msg->pose.pose.position.z;
+  //ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z);
+
+// Check if robot is moving by comparing its current joints position to its latest
+    if (fabs(robot_current_position[0] - robot_last_position[0]) < moveTolerance && fabs(robot_current_position[1] - robot_last_position[1]) < moveTolerance)
+    {
+        moving_state = false;
+	if (!markerPickedUp && robotOnPickupPosition(robot_current_position))
+	{
+	   pickUpMarker();
+	} 
+	else if (markerPickedUp && !markerDroppedOff && robotOnDropOffPosition(robot_current_position))
+	{
+	   dropOffMarker();
+	}
+	else
+	{
+	   if(robot_last_position != robot_current_position)
+	   {
+		robot_last_position = robot_current_position;
+		ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0], robot_current_position[1], robot_current_position[2] );
+	   }
+	}
+    }
+    else 
+    {
+        moving_state = true;
+        robot_last_position = robot_current_position;
+    }    
+}
+
+
+
+
+
+
+
+int main( int argc, char** argv )
+{
+  ros::init(argc, argv, "add_markers");
+  ros::NodeHandle n;
+  ros::Rate r(1);
+  marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+
+  // Subscribe to odometry values
+  ROS_INFO("Subscribing to odom:");
+  ros::Subscriber odomSubscriber = n.subscribe("odom", 10, robot_location_callback);
+
+  
+   // 0. Create/init marker
+   initMarker();
+   setMarkerPositionXY(robot_pickup_position[0],robot_pickup_position[1]);
 
     // Publish the marker
     while (marker_pub.getNumSubscribers() < 1)
@@ -97,66 +236,16 @@ int main( int argc, char** argv )
       sleep(1);
     }
     marker_pub.publish(marker);
-
-    // Cycle between different shapes
-    /* NOTICE: shape change disabled according to project instructions but left here for inspiration
-    switch (shape)
-    {
-    case visualization_msgs::Marker::CUBE:
-      shape = visualization_msgs::Marker::SPHERE;
-      break;
-    case visualization_msgs::Marker::SPHERE:
-      shape = visualization_msgs::Marker::ARROW;
-      break;
-    case visualization_msgs::Marker::ARROW:
-      shape = visualization_msgs::Marker::CYLINDER;
-      break;
-    case visualization_msgs::Marker::CYLINDER:
-      shape = visualization_msgs::Marker::CUBE;
-      break;
-    }
-    */
     r.sleep();
 
+
+
 // 2. Pause 5 seconds
-    ROS_INFO("Waiting for 5 seconds to hide the marker (or marker duration timeout)");
-    ros::Duration(5.0).sleep(); 
+//    ROS_INFO("Waiting for 5 seconds to hide the marker (or marker duration timeout)");
+//    ros::Duration(5.0).sleep(); 
 
-// 3. Hide the marker (DELETE?)
-// currently using duration property ...
-ROS_WARN_ONCE("TODO: check if PICK UP marker is hidden?");
-// 4. Pause 5 seconds
-    ROS_INFO("Waiting for 5 seconds to publish marker on drop zone");
-    ros::Duration(5.0).sleep();
+// Read odometry values until robot reaches pickup zone.
+   ROS_INFO("ros::spin()");  
+   ros::spin();
 
-// 5. Publish marker on DROP OFF Zone 
-    ROS_INFO("Publishing Marker on DROP OFF zone:");
-    marker.pose.position.x = 2; //only moved 2 units (meter?) in x direction.
-    marker.pose.position.y = 0;
-    marker.pose.position.z = 0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-    // Set the color -- be sure to set alpha to something non-zero!
-    marker.color.r = 0.0f;
-    marker.color.g = 1.0f;
-    marker.color.b = 0.0f;
-    marker.color.a = 1.0;
-
-    marker.lifetime = ros::Duration(5); //5 seconds
-
-    // Publish the marker
-    while (marker_pub.getNumSubscribers() < 1)
-    {
-      if (!ros::ok())
-      {
-        return 0;
-      }
-      ROS_WARN_ONCE("Please create a subscriber to the marker");
-      sleep(1);
-    }
-    marker_pub.publish(marker);
-    // 6. Delete/Hide Marker?
-    ROS_WARN_ONCE("TODO: check if DROP OFF marker is hidden?");
 }
