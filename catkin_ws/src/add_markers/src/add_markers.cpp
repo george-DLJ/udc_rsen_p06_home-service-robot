@@ -34,11 +34,11 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/Odometry.h>
 // Define a tolerance threshold to compare double values
-const double positionTolerance = 0.2;//meters
+const double positionTolerance = 0.4;//meters
 const double moveTolerance = 0.0001;//meters
 // Predefined pick up and drop off zones:
-const std::vector<double> robot_pickup_position{ -2.36, 2.17, 0.0 }; //x, y, z
-const std::vector<double> robot_dropoff_position{ -1.36, -1.73, 0.0 }; //x, y, z
+const std::vector<double> robot_pickup_position{ -2.2, 2.4, 0.0 }; //x, y, z
+const std::vector<double> robot_dropoff_position{ -0.3, -0.8, 0.0 }; //x, y, z
 
 // Define global vector of last position:
 std::vector<double> robot_last_position{ 0.0, 0.0, 0.0 };
@@ -86,9 +86,9 @@ void initMarker()
     marker.pose.orientation.w = 1.0;
 
     // Set the scale of the marker -- 1x1x1 here means 1m on a side
-    marker.scale.x = 1.0;
-    marker.scale.y = 1.0;
-    marker.scale.z = 1.0;
+    marker.scale.x = 0.4;
+    marker.scale.y = 0.4;
+    marker.scale.z = 0.4;
 
     // Set the color -- be sure to set alpha to something non-zero!
     marker.color.r = 0.0f;
@@ -128,7 +128,6 @@ void pickUpMarker()
     // Hiding marker:
     ROS_INFO("Hiding Marker");
     hideMarker();
-    // TODO: moveToDropOffZone();
 }
 
 void dropOffMarker()
@@ -138,7 +137,7 @@ void dropOffMarker()
     ros::Duration(5.0).sleep(); 	
     // Change marker  location:
     setMarkerPositionXY(robot_dropoff_position[0], robot_dropoff_position[1]);	
-    // TODO: showMarker(dropOffZone)
+    // showMarker on dropOffZone
     showMarker();
 }
 

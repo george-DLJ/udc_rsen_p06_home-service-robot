@@ -5,6 +5,9 @@
 // Define a client for to send goal requests to the move_base server through a SimpleActionClient
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
 
+const std::vector<double> robot_pickup_position{ -2.2, 2.4, 0.0 }; //x, y, z
+const std::vector<double> robot_dropoff_position{ -0.3, -0.8, 0.0 }; //x, y, z
+
 int main(int argc, char** argv){
   // Initialize the pick_objects node
   ros::init(argc, argv, "pick_objects");
@@ -24,7 +27,8 @@ int main(int argc, char** argv){
   goal.target_pose.header.stamp = ros::Time::now();
 
   // Define a position and orientation for the robot to reach
-  goal.target_pose.pose.position.x = 1.0;
+  goal.target_pose.pose.position.x = robot_pickup_position[0];
+  goal.target_pose.pose.position.y = robot_pickup_position[1];
   goal.target_pose.pose.orientation.w = 1.0;
 
    // Send the goal position and orientation for the robot to reach
@@ -44,8 +48,9 @@ int main(int argc, char** argv){
   ros::Duration(5.0).sleep();  // Sleep for 5 seconds
 
   // 2. Add Drop off goal
-  // 2.1 DONE: add new goal
-  goal.target_pose.pose.position.x = 2.0;
+  // 2.1 DONE: add new goal (DROP OFF zone)
+  goal.target_pose.pose.position.x = robot_dropoff_position[0];
+  goal.target_pose.pose.position.y = robot_dropoff_position[1];
   goal.target_pose.pose.orientation.w = 1.0;
    // Send the goal position and orientation for the robot to reach
   ROS_INFO("Sending Drop Off goal");
