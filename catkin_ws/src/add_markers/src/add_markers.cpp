@@ -29,11 +29,24 @@
 
 /* 2020.08.17 I am using this code following Part 06 project "Home Service Robot" instructions on UDACITY Robot Software Engineering nanodegree as basis to the exercise. */
 
+/* 2020.08.21 UPDATE:
+   After review I've followed the rubric recomendation to use amcl pose instead of odom to get
+   more accuracy between robot pose and markers position.   
+   * #include <nav_msgs/Odometry.h> is not necessary any more and has been 
+   replaced by #include <nav_msgs/Odometry.h> 
+   
+   * on robot_location_callback() the message type has been also replaced with amcl_pose 
+     messages (geometry_msgs::PoseWithCovarianceStamped).
+	
+   * it was observed that amcl pose messages stop comming when robot stops moving. 
+     therefore the logic has been slightly modified.	    
+*/
 
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
-#include <nav_msgs/Odometry.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
+//#include <nav_msgs/Odometry.h> 
+#include <geometry_msgs/PoseWithCovarianceStamped.h> 
+
 // Define a tolerance threshold to compare double values
 const double positionTolerance = 0.1;//meters
 const double moveTolerance = 0.0001;//meters
@@ -61,7 +74,6 @@ void initMarker()
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     marker.header.frame_id = "map";
     marker.header.stamp = ros::Time::now();
-
 
     // Set the namespace and id for this marker.  This serves to create a unique ID
     // Any marker sent with the same namespace and id will overwrite the old one
@@ -164,23 +176,12 @@ bool robotOnDropOffPosition( std::vector<double> robot_current_position)
 	return false;
 }
 
-//void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg) //uses odom msgs
 void robot_location_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg)
 {
-ROS_INFO("AMCL_POSE Position");
-//get current position
-// Get joints current position
     std::vector<double> robot_current_position = {msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z};
+  // DEBUG:
+  // ROS_INFO("robot_current_position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0],robot_current_position[1], robot_current_position[2]); 
 
-  //double posx = msg->pose.pose.position.x;
-  //double posy = msg->pose.pose.position.y;
-  //double posz = msg->pose.pose.position.z;
-  ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z);
-  ROS_INFO("robot_current_position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0],robot_current_position[1], robot_current_position[2]);
-// Check if robot is moving by comparing its current joints position to its latest
-//    if (fabs(robot_current_position[0] - robot_last_position[0]) < moveTolerance && fabs(robot_current_position[1] - robot_last_position[1]) < moveTolerance)
-//    {
-//        moving_state = false;
 	if (!markerPickedUp && robotOnPickupPosition(robot_current_position))
 	{
 	   pickUpMarker();
@@ -197,19 +198,7 @@ ROS_INFO("AMCL_POSE Position");
 		ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0], robot_current_position[1], robot_current_position[2] );
 	   }
 	}
-//    }
-//    else 
-//    {
-//        moving_state = true;
-//        robot_last_position = robot_current_position;
-//    }    
 }
-
-
-
-
-
-
 
 int main( int argc, char** argv )
 {
@@ -229,7 +218,7 @@ int main( int argc, char** argv )
   ROS_INFO("Subscribing to amcl (amcl_pose)");
   ros::Subscriber sub_amcl = n.subscribe("amcl_pose", 10, robot_location_callback);
 
-   // 0. Create/init marker
+   // Create/init marker
    initMarker();
    setMarkerPositionXY(robot_pickup_position[0],robot_pickup_position[1]);
 
@@ -246,14 +235,7 @@ int main( int argc, char** argv )
     marker_pub.publish(marker);
     r.sleep();
 
-
-
-// 2. Pause 5 seconds
-//    ROS_INFO("Waiting for 5 seconds to hide the marker (or marker duration timeout)");
-//    ros::Duration(5.0).sleep(); 
-
-// Read odometry values until robot reaches pickup zone.
-   ROS_INFO("ros::spin()");  
+   // Read pose values until robot reaches pickup zone.
+   ROS_INFO("Read Pose messages ros::spin()");  
    ros::spin();
-   ROS_INFO("exit ros::spin()");  
 }
