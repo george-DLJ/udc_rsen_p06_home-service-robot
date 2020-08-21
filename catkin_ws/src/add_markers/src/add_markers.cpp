@@ -33,8 +33,9 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/Odometry.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 // Define a tolerance threshold to compare double values
-const double positionTolerance = 0.4;//meters
+const double positionTolerance = 0.1;//meters
 const double moveTolerance = 0.0001;//meters
 // Predefined pick up and drop off zones:
 const std::vector<double> robot_pickup_position{ -2.2, 2.4, 0.0 }; //x, y, z
@@ -163,8 +164,10 @@ bool robotOnDropOffPosition( std::vector<double> robot_current_position)
 	return false;
 }
 
-void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg)
+//void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg) //uses odom msgs
+void robot_location_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr &msg)
 {
+ROS_INFO("AMCL_POSE Position");
 //get current position
 // Get joints current position
     std::vector<double> robot_current_position = {msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z};
@@ -172,12 +175,12 @@ void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg)
   //double posx = msg->pose.pose.position.x;
   //double posy = msg->pose.pose.position.y;
   //double posz = msg->pose.pose.position.z;
-  //ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z);
-
+  ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", msg->pose.pose.position.x,msg->pose.pose.position.y, msg->pose.pose.position.z);
+  ROS_INFO("robot_current_position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0],robot_current_position[1], robot_current_position[2]);
 // Check if robot is moving by comparing its current joints position to its latest
-    if (fabs(robot_current_position[0] - robot_last_position[0]) < moveTolerance && fabs(robot_current_position[1] - robot_last_position[1]) < moveTolerance)
-    {
-        moving_state = false;
+//    if (fabs(robot_current_position[0] - robot_last_position[0]) < moveTolerance && fabs(robot_current_position[1] - robot_last_position[1]) < moveTolerance)
+//    {
+//        moving_state = false;
 	if (!markerPickedUp && robotOnPickupPosition(robot_current_position))
 	{
 	   pickUpMarker();
@@ -194,12 +197,12 @@ void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg)
 		ROS_INFO("Position-> x: [%f], y: [%f], z: [%f]", robot_current_position[0], robot_current_position[1], robot_current_position[2] );
 	   }
 	}
-    }
-    else 
-    {
-        moving_state = true;
-        robot_last_position = robot_current_position;
-    }    
+//    }
+//    else 
+//    {
+//        moving_state = true;
+//        robot_last_position = robot_current_position;
+//    }    
 }
 
 
@@ -210,16 +213,22 @@ void robot_location_callback(const nav_msgs::Odometry::ConstPtr &msg)
 
 int main( int argc, char** argv )
 {
+  ROS_INFO("START add_markers.cpp");
   ros::init(argc, argv, "add_markers");
   ros::NodeHandle n;
   ros::Rate r(1);
+ 
   marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
   // Subscribe to odometry values
   ROS_INFO("Subscribing to odom:");
-  ros::Subscriber odomSubscriber = n.subscribe("odom", 10, robot_location_callback);
+  //ros::Subscriber odomSubscriber = n.subscribe("odom", 10, robot_location_callback);
 
-  
+  // PROBLEM: pick_objects (/map) and add_markers (/odom) use different references that change.
+  // Solution 1: subscribe to amcl instead of odom
+  ROS_INFO("Subscribing to amcl (amcl_pose)");
+  ros::Subscriber sub_amcl = n.subscribe("amcl_pose", 10, robot_location_callback);
+
    // 0. Create/init marker
    initMarker();
    setMarkerPositionXY(robot_pickup_position[0],robot_pickup_position[1]);
@@ -246,5 +255,5 @@ int main( int argc, char** argv )
 // Read odometry values until robot reaches pickup zone.
    ROS_INFO("ros::spin()");  
    ros::spin();
-
+   ROS_INFO("exit ros::spin()");  
 }
